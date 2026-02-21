@@ -2,7 +2,7 @@
 
 A goal-driven knowledge base for Claude Code. Uses legal citation patterns and wiki-style organization to provide structured, navigable, citation-backed memory across sessions.
 
-Canon is a directory convention (`.canon/`), a `CLAUDE.md` file, and a set of skills. No compiled binary, no external dependencies. The agent does everything.
+Canon is a directory convention (`.canon/`) and a set of skills. No compiled binary, no external dependencies. The agent does everything.
 
 ---
 
@@ -23,7 +23,7 @@ Meanwhile, two well-established systems for building navigable, citation-backed 
 1. **Goals first.** "Perfect memory" is unbounded. Structure only makes sense relative to what you're trying to accomplish. Canon requires explicit goal definition so it can optimize what to retain, how to organize it, and what to surface.
 2. **Markdown-native.** All state lives in `.md` files. Humans can read them. Git can version them. Any tool can consume them.
 3. **Every claim is cited.** No uncited assertions in reference material. If something is stated, you can trace it back to a source.
-4. **Zero infrastructure.** No CLI binary, no server, no database. Just a directory convention and a `CLAUDE.md` that teaches Claude Code how to operate on it. A working knowledge base is one `git clone` away.
+4. **Zero infrastructure.** No CLI binary, no server, no database. Just a directory convention and a set of skills that teach Claude Code how to operate on it. A working knowledge base is one `git clone` away.
 
 ---
 
@@ -31,7 +31,6 @@ Meanwhile, two well-established systems for building navigable, citation-backed 
 
 ```
 project-root/
-├── CLAUDE.md                      # Core agent instructions (overview, formats, consistency rules)
 ├── .claude/
 │   └── skills/                    # Skill definitions (one dir per slash command)
 │       ├── crystallize/
@@ -68,8 +67,6 @@ project-root/
 ```
 
 ### Special Files
-
-**`CLAUDE.md`** — Core agent instructions. Contains the directory convention, file formats, citation syntax, addressing rules, and consistency model. This is the shared context that all skills reference. It does *not* contain workflow definitions — those live in skills. Workflow logic is factored into skills so each is self-contained and independently editable. If a workflow misbehaves, you refine that skill's `SKILL.md` — the blast radius is scoped.
 
 **`GOALS.md`** — The goal tree. Hierarchical, abstract. Sub-goals nest until they become indistinguishable from action plans, at which point they live in `plans/`. Can include conflict-resolution steps and decision criteria. Can reference and be referenced by any reference file.
 
@@ -218,7 +215,7 @@ Canon requires explicit goal definition before it becomes useful. The `/crystall
 
 ## Skills
 
-Skills are the entire user interface. Each skill is a `SKILL.md` file in `.claude/skills/<skill-name>/` that defines one workflow. Claude Code discovers them automatically — the skill's `description` frontmatter tells Claude when to invoke it, and users can invoke any skill directly with `/<skill-name>`.
+Skills are the entire user interface. Each skill is a `SKILL.md` file in `.claude/skills/<skill-name>/` that defines one workflow. Claude Code discovers them automatically — the skill's `description` frontmatter tells Claude when to invoke it, and users can invoke any skill directly with `/<skill-name>`. Each skill is self-contained and independently editable — if a workflow misbehaves, you refine that skill's `SKILL.md`.
 
 | Skill | What it triggers |
 |-------|-----------------|
