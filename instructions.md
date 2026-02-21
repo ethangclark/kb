@@ -54,7 +54,7 @@ project-root/
     ├── GOALS.md                   # Goal tree (required)
     ├── plans/                     # Granular sub-goals / action plans
     │   └── {plan}.md
-    ├── proposals/                 # Agent-drafted goal/plan revisions awaiting user review
+    ├── proposals/                 # Pending changes to GOALS.md or plans (queue, not archive)
     │   └── {proposal}.md
     ├── reference/
     │   ├── INDEX.md               # Navigation index (required)
@@ -69,17 +69,17 @@ project-root/
 
 ### Special Files
 
-**`CLAUDE.md`** — Core agent instructions. Contains the directory convention, file formats, citation syntax, addressing rules, and consistency model. This is the shared context that all skills reference. It does *not* contain workflow definitions — those live in skills.
+**`CLAUDE.md`** — Core agent instructions. Contains the directory convention, file formats, citation syntax, addressing rules, and consistency model. This is the shared context that all skills reference. It does *not* contain workflow definitions — those live in skills. Workflow logic is factored into skills so each is self-contained and independently editable. If a workflow misbehaves, you refine that skill's `SKILL.md` — the blast radius is scoped.
 
 **`GOALS.md`** — The goal tree. Hierarchical, abstract. Sub-goals nest until they become indistinguishable from action plans, at which point they live in `plans/`. Can include conflict-resolution steps and decision criteria. Can reference and be referenced by any reference file.
 
-**`proposals/`** — Agent-drafted revisions to the goal tree or plans. When ingestion reveals a more efficient path to a root goal, the agent writes a proposal here with citations to the source that triggered it. The user reviews via `/review`. The agent never autonomously modifies `GOALS.md` or plan files. Every proposal must be referenced by a plan file or `GOALS.md`; orphaned proposals are deleted.
+**`proposals/`** — A queue of agent-drafted changes to `GOALS.md` or plan files. Each proposal describes a specific change, cites the source that motivated it, and explains the reasoning. The agent never modifies `GOALS.md` or plan files directly — it writes a proposal instead. `/review` processes the queue: accepted proposals are applied and the proposal file is deleted; rejected proposals are deleted. Nothing in `proposals/` is permanent.
 
 **`reference/INDEX.md`** — Navigation index for reference material. Every reference document must be reachable from here. Entry point for both human browsing and agent traversal during `/recall`. Updated by the agent when reference docs are created, moved, or deleted. Follows the same frontmatter and formatting rules as any other reference file.
 
 ---
 
-## Frontmatter
+## Frontmatter and Reference Format
 
 All `.canon/` content files share a common frontmatter shape: `headnote` + `last_updated`, plus any type-specific fields. This keeps parsing uniform and makes every document self-describing for retrieval.
 
@@ -98,18 +98,46 @@ ingested: 2026-02-21T14:30:00Z
 
 ### Reference files (`reference/**/*.md`)
 
-```yaml
+Reference docs use `§`-numbered sections with inline citations:
+
+```markdown
 ---
 headnote: Acme Services is a distressed regional contractor specializing
   in residential exterior work. Revenue ~$12M trailing. Key risk is
   recent loss of senior project manager and geographic concentration.
 last_updated: 2026-02-21T15:44:00Z
 ---
+
+# Acme Services
+
+## §1 Company Overview
+
+### §1.1 Business Profile
+Claim text with citation immediately after.
+[Established: src-20260115-091500-acme-cim["anchor start"…"anchor end"]]
+
+### §1.2 Financial Summary
+Claim with multiple citations.
+[Established: src-20260108-investor-call["from"…"to"];
+cf. industries/residential-contracting§2;
+but see: src-20260201-investor-update["from"…"to"]]
+
+## §2 Key Personnel
+
+### §2.1 Leadership
+Cross-references to other knowledge base sections.
+[Established: src-20260115-091500-acme-cim["from"…"to"];
+accord: people/deal-lead§2.1;
+see generally: frameworks/sde-calculation§3]
 ```
 
-`headnote` is an agent-written summary optimized for retrieval — the primary signal used during `/recall` traversal. `last_updated` is when the doc was last substantively changed.
+Rules:
 
-### Goal, plan, and proposal files (`.canon/GOALS.md`, `.canon/plans/*.md`, `.canon/proposals/*.md`)
+- Subsections nest: `§2` → `§2.1` → `§2.1.1` (depth as needed).
+- **Every factual claim must have a citation.** No exceptions.
+- The `headnote` is agent-written and kept current. It's the primary signal used during `/recall` traversal.
+
+### Goal and plan files (`.canon/GOALS.md`, `.canon/plans/*.md`)
 
 ```yaml
 ---
@@ -119,53 +147,25 @@ last_updated: 2026-02-21T12:00:00Z
 ---
 ```
 
-`headnote` summarizes the goal, plan, or proposed change. `last_updated` tracks the most recent modification. Proposals may additionally include `source:` to reference the source that triggered them.
+`headnote` summarizes the goal or plan. `last_updated` tracks the most recent modification.
+
+### Proposal files (`.canon/proposals/*.md`)
+
+```yaml
+---
+headnote: Split geographic search into Southeast and Mid-Atlantic sub-goals
+  based on new market data showing divergent contractor density.
+last_updated: 2026-02-21T16:00:00Z
+source: src-20260221-143000-investor-call-feb-21
+target: GOALS.md
+---
+```
+
+`headnote` summarizes the proposed change. `source` references the source that triggered it. `target` identifies the file to be modified (`GOALS.md` or a plan file). Proposals are queue items — they are deleted after `/review` processes them (whether accepted or rejected).
 
 ### Unprocessed files (`.canon/unprocessed/`)
 
 Files in `unprocessed/` are source material that hasn't been integrated yet. No naming convention or frontmatter is required — they can be in any format. When processed via `/ingest` or `/triage`, the agent creates a proper source file in `sources/` with full frontmatter.
-
----
-
-## Reference Document Format
-
-YAML frontmatter → `§`-numbered sections → prose with inline citations.
-
-```markdown
----
-headnote: 2-4 sentence summary optimized for LLM retrieval.
-  Key conclusions and current state.
-last_updated: 2026-02-15T13:44:22Z
----
-
-# Document Title
-
-## §1 Top-Level Section
-
-### §1.1 Subsection
-Claim text with citation immediately after.
-[Established: src-20260115-091500-acme-cim["anchor start"…"anchor end"]]
-
-### §1.2 Another Subsection
-Claim with multiple citations.
-[Established: src-20260108-investor-call["from"…"to"];
-cf. industries/residential-contracting§2;
-but see: src-20260201-investor-update["from"…"to"]]
-
-## §2 Next Section
-
-### §2.1 Subsection
-Cross-references to other knowledge base sections.
-[Established: src-20260115-091500-acme-cim["from"…"to"];
-accord: people/deal-lead§2.1;
-see generally: frameworks/sde-calculation§3]
-```
-
-### Rules
-
-- Subsections nest: `§2` → `§2.1` → `§2.1.1` (depth as needed).
-- **Every factual claim must have a citation.** No exceptions.
-- The `headnote` is agent-written and kept current. It's the primary signal used during `/recall` traversal.
 
 ### Addressing
 
@@ -192,17 +192,16 @@ see generally: frameworks/sde-calculation§3]
 
 ## Consistency Model
 
-The agent maintains consistency during every write operation. This means:
+The agent maintains consistency during every write operation. After modifying files, it runs `/lint` scoped to the affected files as the final step. The checks are:
 
-1. When a reference doc is updated, everything that cites it must be checked for continued validity.
-2. If a downstream reference is invalidated, it must be updated too — recursively — until the knowledge base is settled.
-3. `INDEX.md` must reflect the current reference directory structure. No orphaned documents (unreachable from `INDEX.md`). No dead links.
-4. Every proposal in `proposals/` must be referenced by a plan file or `GOALS.md`. Orphaned proposals are deleted.
-5. No dead links (references to nonexistent sections or sources).
+1. All citations resolve to existing sources.
+2. All `["from"…"to"]` text spans match content in the referenced source.
+3. All cross-references (`§` addresses) resolve to existing sections.
+4. `INDEX.md` entries match the files that actually exist in `reference/`.
+5. Every proposal has a valid `target` that exists.
+6. All content files have valid frontmatter for their type.
 
-The agent enforces this by running a validation pass as the final step of every write workflow (`/ingest`, `/triage` → process, `/review` → accept). The validation walks citations, cross-references, and the index, confirming everything resolves. If anything is broken, the agent fixes it before declaring the operation complete.
-
-If the knowledge base grows large enough that agent-based validation becomes unreliable or slow, that's the signal to extract a dedicated lint tool. Until then, the agent handles it.
+When a reference doc is updated, everything that cites it must be checked for continued validity. If a downstream reference is invalidated, it must be updated too — recursively — until the knowledge base is settled. The scope of `/lint` expands to cover these downstream files.
 
 ---
 
@@ -230,40 +229,31 @@ Skills are the entire user interface. Each skill is a `SKILL.md` file in `.claud
 | `/check <claim>` | Claim verification against the knowledge base |
 | `/triage` | Walk through unprocessed items |
 | `/review` | Walk through pending goal/plan proposals |
-| `/lint` | Validate KB consistency (citations, links, indexes, orphans) |
+| `/lint <file> [<file>...]` | Validate consistency of specified files |
 
 ### Skill file format
 
-Each skill lives in its own directory under `.claude/skills/` and contains a `SKILL.md` with YAML frontmatter and markdown instructions. Example for `/ingest`:
+Each skill lives in its own directory under `.claude/skills/` and contains a `SKILL.md` with YAML frontmatter and markdown instructions:
 
 ```yaml
 ---
-name: ingest
-description: Store a source document and integrate its claims into the Canon
-  knowledge base. Use when the user provides a document, file, or information
-  to be ingested into .canon/.
+name: check
+description: Verify a specific claim against the Canon knowledge base.
+  Use when the user wants to fact-check a statement or confirm whether
+  something is supported by ingested sources.
+argument-hint: [claim]
 ---
 
-Given a source document (provided inline, as a file path, or described by the
-user) with a name and optional context:
+Verify the claim `$ARGUMENTS` against the knowledge base.
 
 ## Steps
-1. Create the source file in `.canon/sources/` with appropriate frontmatter.
-2. Read `.canon/GOALS.md` to understand what matters.
-3. Extract claims from the source, generating inline citations with text-span
-   anchors.
-...
-
-## Constraints
-- Never modify GOALS.md or plan files directly. Draft proposals instead.
-- Every factual claim must have an inline citation.
-- Run /lint as the final step.
+1. Locate relevant reference material via INDEX.md traversal.
+2. Evaluate whether the claim is supported, contradicted, or unaddressed.
+3. Respond with citations for each determination.
 
 ## Completion Criteria
-- Source file exists in `sources/`.
-- All extracted claims are cited in reference docs.
-- INDEX.md reflects any new or moved documents.
-- /lint passes with no errors.
+- Claim assessed as supported, contradicted, partially supported, or
+  not addressed — with citations for each determination.
 ```
 
 Key frontmatter fields:
@@ -297,9 +287,9 @@ Given a source document (provided inline, as a file path, or described by the us
 7. Check downstream: read everything that references changed sections. Update if the change invalidates them. Repeat until settled.
 8. If the source reveals a more efficient path to a root goal, draft a proposal in `.canon/proposals/` with citations to the triggering source.
 9. If relevance to goals is ambiguous, place in `unprocessed/` instead.
-10. Run `/lint` as a final check.
+10. Run `/lint` on each file created or modified in the above steps.
 
-**Completion criteria:** Source file in `sources/`. All extracted claims cited in reference docs. `INDEX.md` current. No broken links or orphaned docs. No orphaned proposals. Any goal-revision proposals drafted.
+**Completion criteria:** Source file in `sources/`. All extracted claims cited in reference docs. `INDEX.md` current. No broken links or orphaned docs. Any goal-revision proposals drafted.
 
 ### `/recall <query>`
 
@@ -338,45 +328,15 @@ Surface items in `unprocessed/` ordered by age (oldest first) and walk the user 
 
 ### `/review`
 
-Walk the user through pending items in `.canon/proposals/`. For each proposal, present the suggested change, the source that triggered it, and the reasoning. The user accepts, modifies, or discards. Accepted proposals are applied to `GOALS.md` or plan files, and the agent settles any downstream effects.
+Walk the user through pending items in `.canon/proposals/`. For each proposal, present the proposed change, the target file, the source that triggered it, and the reasoning. The user accepts, modifies, or rejects. Accepted proposals are applied to the target file and the proposal is deleted. Rejected proposals are deleted. The agent settles any downstream effects of accepted changes.
 
-**Completion criteria:** All proposals addressed. Any accepted changes applied and KB consistency verified.
+**Completion criteria:** `proposals/` is empty. Any accepted changes applied and KB consistency verified.
 
-### `/lint`
+### `/lint <file> [<file>...]`
 
-Validate knowledge base consistency. The agent reads the full `.canon/` structure and checks:
+Run the consistency checks from the Consistency Model section against one or more specific files. Example: `/lint reference/deals/acme-services.md proposals/split-geo-search.md`. Linting a file also verifies what it directly references (e.g. checking a reference doc confirms its citations resolve to real source spans).
 
-- All citations resolve to existing sources.
-- All `["from"…"to"]` text spans match content in the referenced source.
-- All cross-references (`§` addresses) resolve to existing sections.
-- `INDEX.md` is complete (no orphaned docs, no dead links).
-- All proposals are referenced by a plan file or `GOALS.md`.
-- All reference docs (including `INDEX.md`) have valid frontmatter (headnote + last_updated).
-- All source files have valid frontmatter (headnote + last_updated + name + ingested).
-
-Reports errors if any. This is the same validation the agent runs at the end of every write operation, exposed as a standalone command for manual use or verification.
-
-**Completion criteria:** Full report of errors, or confirmation that the KB is clean.
-
----
-
-## CLAUDE.md Structure
-
-`CLAUDE.md` contains the shared context that all skills reference: directory conventions, file formats, citation syntax, addressing rules, and the consistency model. It does *not* contain workflow definitions — those live in individual `SKILL.md` files under `.claude/skills/`.
-
-```markdown
-# Canon — Knowledge Base Agent Instructions
-
-## Overview
-Canon is a goal-driven knowledge base stored in `.canon/`.
-[Directory structure, frontmatter specs, reference doc format,
-addressing syntax, citation signals.]
-
-## Consistency Rules
-[The consistency model: what the agent must verify after every write.]
-```
-
-Workflow logic is factored into skills so that each workflow is self-contained and independently editable. If a workflow misbehaves, you refine that skill's `SKILL.md` — the blast radius is scoped. Both `CLAUDE.md` and the skills directory are version-controlled, so changes are tracked alongside the knowledge they operate on.
+**Completion criteria:** Full report of errors for the specified files, or confirmation that they are clean.
 
 ---
 
@@ -403,7 +363,3 @@ The current design flags contradictions with `But see:` citations and defers res
 ### Recall Depth vs. Cost
 
 The reasoning-based `/recall` traversal is powerful but potentially expensive for deep knowledge bases. Need to think about traversal budgets, caching of recent traversals, or pre-computed "hot paths" based on goal relevance.
-
-### When to Extract a Lint Tool
-
-Agent-based `/lint` works fine for small knowledge bases. As the KB grows, deterministic validation may become worth extracting into a standalone tool for speed and reliability. The trigger is when `/lint` starts taking noticeably long or producing inconsistent results across runs.
