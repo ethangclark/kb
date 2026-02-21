@@ -57,16 +57,14 @@ project-root/
     ├── proposals/                 # Agent-drafted goal/plan revisions awaiting user review
     │   └── {proposal}.md
     ├── reference/
-    │   ├── INDEX.md               # Root navigation index (required)
+    │   ├── INDEX.md               # Navigation index (required)
     │   └── {domain}/
-    │       ├── INDEX.md           # Local navigation (if needed)
     │       └── {topic}.md
     ├── sources/
     │   ├── src-YYYYMMDD-HHMMSS-slugified-name.md
     │   └── src-YYYYMMDD-HHMMSS-slugified-name.raw.pdf  (optional binary)
-    └── unprocessed/
-        ├── src-YYYYMMDD-HHMMSS-slugified-name.md
-        └── src-YYYYMMDD-HHMMSS-slugified-name.raw.pdf  (optional binary)
+    └── unprocessed/              # Source files not yet integrated
+        └── ...
 ```
 
 ### Special Files
@@ -75,19 +73,17 @@ project-root/
 
 **`GOALS.md`** — The goal tree. Hierarchical, abstract. Sub-goals nest until they become indistinguishable from action plans, at which point they live in `plans/`. Can include conflict-resolution steps and decision criteria. Can reference and be referenced by any reference file.
 
-**`proposals/`** — Agent-drafted revisions to the goal tree or plans. When ingestion reveals a more efficient path to a root goal, the agent writes a proposal here with citations to the source that triggered it. The user reviews via `/review`. The agent never autonomously modifies `GOALS.md` or plan files.
+**`proposals/`** — Agent-drafted revisions to the goal tree or plans. When ingestion reveals a more efficient path to a root goal, the agent writes a proposal here with citations to the source that triggered it. The user reviews via `/review`. The agent never autonomously modifies `GOALS.md` or plan files. Every proposal must be referenced by a plan file or `GOALS.md`; orphaned proposals are deleted.
 
-**`reference/INDEX.md`** — Root-level navigation index. Every reference document must be reachable from here, either directly or through nested `INDEX.md` files in subdirectories. Entry point for both human browsing and agent traversal during `/recall`. Updated by the agent when reference docs are created, moved, or deleted.
-
-**Nested `INDEX.md` files** — Subdirectories may contain their own `INDEX.md` for local navigation. The root `INDEX.md` links to these. The full index tree must be consistent: no orphaned docs, no dead links.
+**`reference/INDEX.md`** — Navigation index for reference material. Every reference document must be reachable from here. Entry point for both human browsing and agent traversal during `/recall`. Updated by the agent when reference docs are created, moved, or deleted. Follows the same frontmatter and formatting rules as any other reference file.
 
 ---
 
 ## Frontmatter
 
-All `.canon/` content files (except `INDEX.md`) share a common frontmatter shape: `headnote` + `last_updated`, plus any type-specific fields. This keeps parsing uniform and makes every document self-describing for retrieval.
+All `.canon/` content files share a common frontmatter shape: `headnote` + `last_updated`, plus any type-specific fields. This keeps parsing uniform and makes every document self-describing for retrieval.
 
-### Source files (`.canon/sources/src-*.md` and `.canon/unprocessed/src-*.md`)
+### Source files (`.canon/sources/src-*.md`)
 
 ```yaml
 ---
@@ -98,9 +94,9 @@ ingested: 2026-02-21T14:30:00Z
 ---
 ```
 
-`headnote` summarizes the source's content for retrieval. `last_updated` tracks the most recent modification. `name` is the human label (also used in the filename slug). `ingested` is when the source entered the system. Unprocessed files use the same schema — they are source files that haven't been integrated yet. When processed, they move to `sources/` with frontmatter intact.
+`headnote` summarizes the source's content for retrieval. `last_updated` tracks the most recent modification. `name` is the human label (also used in the filename slug). `ingested` is when the source entered the system.
 
-### Reference files (`reference/**/*.md`, excluding `INDEX.md`)
+### Reference files (`reference/**/*.md`)
 
 ```yaml
 ---
@@ -125,9 +121,9 @@ last_updated: 2026-02-21T12:00:00Z
 
 `headnote` summarizes the goal, plan, or proposed change. `last_updated` tracks the most recent modification. Proposals may additionally include `source:` to reference the source that triggered them.
 
-### INDEX.md files
+### Unprocessed files (`.canon/unprocessed/`)
 
-No frontmatter. Purely structural/navigational, auto-maintained by the agent.
+Files in `unprocessed/` are source material that hasn't been integrated yet. No naming convention or frontmatter is required — they can be in any format. When processed via `/ingest` or `/triage`, the agent creates a proper source file in `sources/` with full frontmatter.
 
 ---
 
@@ -200,11 +196,11 @@ The agent maintains consistency during every write operation. This means:
 
 1. When a reference doc is updated, everything that cites it must be checked for continued validity.
 2. If a downstream reference is invalidated, it must be updated too — recursively — until the knowledge base is settled.
-3. All `INDEX.md` files must reflect the current directory structure.
-4. No orphaned documents (unreachable from root `INDEX.md`).
+3. `INDEX.md` must reflect the current reference directory structure. No orphaned documents (unreachable from `INDEX.md`). No dead links.
+4. Every proposal in `proposals/` must be referenced by a plan file or `GOALS.md`. Orphaned proposals are deleted.
 5. No dead links (references to nonexistent sections or sources).
 
-The agent enforces this by running a validation pass as the final step of every write workflow (`/ingest`, `/triage` → process, `/review` → accept). The validation reads all `INDEX.md` files, walks citations and cross-references, and confirms everything resolves. If anything is broken, the agent fixes it before declaring the operation complete.
+The agent enforces this by running a validation pass as the final step of every write workflow (`/ingest`, `/triage` → process, `/review` → accept). The validation walks citations, cross-references, and the index, confirming everything resolves. If anything is broken, the agent fixes it before declaring the operation complete.
 
 If the knowledge base grows large enough that agent-based validation becomes unreliable or slow, that's the signal to extract a dedicated lint tool. Until then, the agent handles it.
 
@@ -266,7 +262,7 @@ user) with a name and optional context:
 ## Completion Criteria
 - Source file exists in `sources/`.
 - All extracted claims are cited in reference docs.
-- INDEX.md files reflect any new or moved documents.
+- INDEX.md reflects any new or moved documents.
 - /lint passes with no errors.
 ```
 
@@ -297,13 +293,13 @@ Given a source document (provided inline, as a file path, or described by the us
 3. Extract claims from the source, generating inline citations with text-span anchors.
 4. For each claim, determine where it belongs in the reference tree (new doc, existing section, or new section in existing doc).
 5. Write or update reference docs with cited claims. Update headnotes.
-6. Update `INDEX.md` files as needed.
+6. Update `INDEX.md` as needed.
 7. Check downstream: read everything that references changed sections. Update if the change invalidates them. Repeat until settled.
 8. If the source reveals a more efficient path to a root goal, draft a proposal in `.canon/proposals/` with citations to the triggering source.
 9. If relevance to goals is ambiguous, place in `unprocessed/` instead.
 10. Run `/lint` as a final check.
 
-**Completion criteria:** Source file in `sources/`. All extracted claims cited in reference docs. `INDEX.md` current. No broken links or orphaned docs. Any goal-revision proposals drafted.
+**Completion criteria:** Source file in `sources/`. All extracted claims cited in reference docs. `INDEX.md` current. No broken links or orphaned docs. No orphaned proposals. Any goal-revision proposals drafted.
 
 ### `/recall <query>`
 
@@ -353,8 +349,9 @@ Validate knowledge base consistency. The agent reads the full `.canon/` structur
 - All citations resolve to existing sources.
 - All `["from"…"to"]` text spans match content in the referenced source.
 - All cross-references (`§` addresses) resolve to existing sections.
-- All `INDEX.md` files are complete (no orphaned docs, no dead links).
-- All reference docs have valid frontmatter (headnote + last_updated).
+- `INDEX.md` is complete (no orphaned docs, no dead links).
+- All proposals are referenced by a plan file or `GOALS.md`.
+- All reference docs (including `INDEX.md`) have valid frontmatter (headnote + last_updated).
 - All source files have valid frontmatter (headnote + last_updated + name + ingested).
 
 Reports errors if any. This is the same validation the agent runs at the end of every write operation, exposed as a standalone command for manual use or verification.
