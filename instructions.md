@@ -2,7 +2,7 @@
 
 A goal-driven knowledge base for Claude Code. Uses legal citation patterns and wiki-style organization to provide structured, navigable, citation-backed memory across sessions.
 
-Canon is a directory convention (`.canon/`), a `CLAUDE.md` file, and a set of slash commands. No compiled binary, no external dependencies. The agent does everything.
+Canon is a directory convention (`.canon/`), a `CLAUDE.md` file, and a set of skills. No compiled binary, no external dependencies. The agent does everything.
 
 ---
 
@@ -31,14 +31,31 @@ Meanwhile, two well-established systems for building navigable, citation-backed 
 
 ```
 project-root/
-├── CLAUDE.md                      # Slash command definitions and workflow instructions
+├── CLAUDE.md                      # Core agent instructions (overview, formats, consistency rules)
+├── .claude/
+│   └── skills/                    # Skill definitions (one dir per slash command)
+│       ├── crystallize/
+│       │   └── SKILL.md
+│       ├── ingest/
+│       │   └── SKILL.md
+│       ├── recall/
+│       │   └── SKILL.md
+│       ├── brief/
+│       │   └── SKILL.md
+│       ├── check/
+│       │   └── SKILL.md
+│       ├── triage/
+│       │   └── SKILL.md
+│       ├── review/
+│       │   └── SKILL.md
+│       └── lint/
+│           └── SKILL.md
 └── .canon/
-    ├── goals/
-    │   ├── GOALS.md               # Goal tree (required)
-    │   ├── plans/                 # Granular sub-goals / action plans
-    │   │   └── {plan}.md
-    │   └── proposals/             # Agent-drafted goal/plan revisions awaiting user review
-    │       └── {proposal}.md
+    ├── GOALS.md                   # Goal tree (required)
+    ├── plans/                     # Granular sub-goals / action plans
+    │   └── {plan}.md
+    ├── proposals/                 # Agent-drafted goal/plan revisions awaiting user review
+    │   └── {proposal}.md
     ├── reference/
     │   ├── INDEX.md               # Root navigation index (required)
     │   └── {domain}/
@@ -54,11 +71,11 @@ project-root/
 
 ### Special Files
 
-**`CLAUDE.md`** — The control plane. One section per slash command, defining workflow steps, constraints, and completion criteria. This is the entire "application logic" of Canon.
+**`CLAUDE.md`** — Core agent instructions. Contains the directory convention, file formats, citation syntax, addressing rules, and consistency model. This is the shared context that all skills reference. It does *not* contain workflow definitions — those live in skills.
 
-**`goals/GOALS.md`** — The goal tree. Hierarchical, abstract. Sub-goals nest until they become indistinguishable from action plans, at which point they live in `goals/plans/`. Can include conflict-resolution steps and decision criteria. Can reference and be referenced by any reference file.
+**`GOALS.md`** — The goal tree. Hierarchical, abstract. Sub-goals nest until they become indistinguishable from action plans, at which point they live in `plans/`. Can include conflict-resolution steps and decision criteria. Can reference and be referenced by any reference file.
 
-**`goals/proposals/`** — Agent-drafted revisions to the goal tree or plans. When ingestion reveals a more efficient path to a root goal, the agent writes a proposal here with citations to the source that triggered it. The user reviews via `/review`. The agent never autonomously modifies `GOALS.md` or plan files.
+**`proposals/`** — Agent-drafted revisions to the goal tree or plans. When ingestion reveals a more efficient path to a root goal, the agent writes a proposal here with citations to the source that triggered it. The user reviews via `/review`. The agent never autonomously modifies `GOALS.md` or plan files.
 
 **`reference/INDEX.md`** — Root-level navigation index. Every reference document must be reachable from here, either directly or through nested `INDEX.md` files in subdirectories. Entry point for both human browsing and agent traversal during `/recall`. Updated by the agent when reference docs are created, moved, or deleted.
 
@@ -68,17 +85,20 @@ project-root/
 
 ## Frontmatter
 
+All `.canon/` content files (except `INDEX.md`) share a common frontmatter shape: `headnote` + `last_updated`, plus any type-specific fields. This keeps parsing uniform and makes every document self-describing for retrieval.
+
 ### Source files (`.canon/sources/src-*.md` and `.canon/unprocessed/src-*.md`)
 
 ```yaml
 ---
+headnote: "Call with lead investor re: target company. Focus on org changes and updated revenue."
+last_updated: 2026-02-21T14:30:00Z
 name: investor-call-feb-21
 ingested: 2026-02-21T14:30:00Z
-context: "Call with lead investor re: target company. Focus on org changes and updated revenue."
 ---
 ```
 
-`name` is the human label (also used in the filename slug). `ingested` is when it entered the system. `context` is optional user-provided guidance that informs how the agent extracts claims and prioritizes content during ingestion. Unprocessed files use the same schema — they are source files that haven't been integrated yet. When processed, they move to `sources/` with frontmatter intact.
+`headnote` summarizes the source's content for retrieval. `last_updated` tracks the most recent modification. `name` is the human label (also used in the filename slug). `ingested` is when the source entered the system. Unprocessed files use the same schema — they are source files that haven't been integrated yet. When processed, they move to `sources/` with frontmatter intact.
 
 ### Reference files (`reference/**/*.md`, excluding `INDEX.md`)
 
@@ -93,15 +113,17 @@ last_updated: 2026-02-21T15:44:00Z
 
 `headnote` is an agent-written summary optimized for retrieval — the primary signal used during `/recall` traversal. `last_updated` is when the doc was last substantively changed.
 
-### Goal and plan files (`goals/**/*.md`, excluding `proposals/`)
+### Goal, plan, and proposal files (`.canon/GOALS.md`, `.canon/plans/*.md`, `.canon/proposals/*.md`)
 
 ```yaml
 ---
+headnote: Acquire a residential exterior contractor in the Southeast
+  with $8-15M revenue and owner willing to stay 12+ months post-close.
 last_updated: 2026-02-21T12:00:00Z
 ---
 ```
 
-Just the timestamp. The goal tree's structure is the content — no headnote needed since `GOALS.md` is always read in full and plans are navigated from it directly.
+`headnote` summarizes the goal, plan, or proposed change. `last_updated` tracks the most recent modification. Proposals may additionally include `source:` to reference the source that triggered them.
 
 ### INDEX.md files
 
@@ -190,23 +212,21 @@ If the knowledge base grows large enough that agent-based validation becomes unr
 
 ## Crystallization
 
-Canon requires explicit goal definition before it becomes useful. The `/crystallize` slash command drives this process:
+Canon requires explicit goal definition before it becomes useful. The `/crystallize` skill drives this process:
 
 1. The user runs `/crystallize` to begin an interactive goal-refinement session.
 2. The agent works with the user to build or refine the goal tree in `GOALS.md`, creating sub-goals and plans until the tree is complete and actionable.
-3. Goals are refined hierarchically — sub-goals are clarified until further refinement would be less productive than starting execution.
+3. Important heuristic: Goals are refined hierarchically — sub-goals are clarified until further refinement would be less conducive to root goal achievement than starting execution.
 4. Once the goal tree is stable, the system is "crystallized" and ready for ingestion.
-
-**Bootstrap shortcut:** If `/ingest` is run before crystallization, the agent either infers goal relevance from the document content (drafting a `GOALS.md` proposal for user review) or places the document in `unprocessed/` if the connection to goals is ambiguous.
 
 ---
 
-## Slash Commands
+## Skills
 
-Slash commands are the entire user interface. Each maps to a section in `CLAUDE.md` that defines the workflow.
+Skills are the entire user interface. Each skill is a `SKILL.md` file in `.claude/skills/<skill-name>/` that defines one workflow. Claude Code discovers them automatically — the skill's `description` frontmatter tells Claude when to invoke it, and users can invoke any skill directly with `/<skill-name>`.
 
-| Command | What it triggers |
-|---------|-----------------|
+| Skill | What it triggers |
+|-------|-----------------|
 | `/crystallize` | Interactive goal refinement session |
 | `/ingest` | Claim extraction, citation, reference updates, consistency settlement |
 | `/recall <query>` | Reasoning-based index traversal to answer a question |
@@ -215,6 +235,52 @@ Slash commands are the entire user interface. Each maps to a section in `CLAUDE.
 | `/triage` | Walk through unprocessed items |
 | `/review` | Walk through pending goal/plan proposals |
 | `/lint` | Validate KB consistency (citations, links, indexes, orphans) |
+
+### Skill file format
+
+Each skill lives in its own directory under `.claude/skills/` and contains a `SKILL.md` with YAML frontmatter and markdown instructions. Example for `/ingest`:
+
+```yaml
+---
+name: ingest
+description: Store a source document and integrate its claims into the Canon
+  knowledge base. Use when the user provides a document, file, or information
+  to be ingested into .canon/.
+---
+
+Given a source document (provided inline, as a file path, or described by the
+user) with a name and optional context:
+
+## Steps
+1. Create the source file in `.canon/sources/` with appropriate frontmatter.
+2. Read `.canon/GOALS.md` to understand what matters.
+3. Extract claims from the source, generating inline citations with text-span
+   anchors.
+...
+
+## Constraints
+- Never modify GOALS.md or plan files directly. Draft proposals instead.
+- Every factual claim must have an inline citation.
+- Run /lint as the final step.
+
+## Completion Criteria
+- Source file exists in `sources/`.
+- All extracted claims are cited in reference docs.
+- INDEX.md files reflect any new or moved documents.
+- /lint passes with no errors.
+```
+
+Key frontmatter fields:
+
+| Field | Purpose |
+|-------|---------|
+| `name` | The `/slash-command` name. If omitted, uses the directory name. |
+| `description` | Tells Claude when to invoke the skill automatically. Also shown in autocomplete. |
+| `disable-model-invocation` | Set `true` to prevent Claude from auto-invoking (manual `/name` only). |
+| `allowed-tools` | Tools Claude can use without per-use approval when the skill is active. |
+| `argument-hint` | Hint shown during autocomplete, e.g. `[query]` or `[topic]`. |
+
+See [Claude Code skills documentation](https://code.claude.com/docs/en/skills) for the full reference.
 
 ### `/crystallize`
 
@@ -227,13 +293,13 @@ Interactive goal refinement. The agent works with the user to build or refine th
 Given a source document (provided inline, as a file path, or described by the user) with a name and optional context:
 
 1. Create the source file in `.canon/sources/` with appropriate frontmatter.
-2. Read `goals/GOALS.md` to understand what matters.
+2. Read `.canon/GOALS.md` to understand what matters.
 3. Extract claims from the source, generating inline citations with text-span anchors.
 4. For each claim, determine where it belongs in the reference tree (new doc, existing section, or new section in existing doc).
 5. Write or update reference docs with cited claims. Update headnotes.
 6. Update `INDEX.md` files as needed.
 7. Check downstream: read everything that references changed sections. Update if the change invalidates them. Repeat until settled.
-8. If the source reveals a more efficient path to a root goal, draft a proposal in `goals/proposals/` with citations to the triggering source.
+8. If the source reveals a more efficient path to a root goal, draft a proposal in `.canon/proposals/` with citations to the triggering source.
 9. If relevance to goals is ambiguous, place in `unprocessed/` instead.
 10. Run `/lint` as a final check.
 
@@ -276,7 +342,7 @@ Surface items in `unprocessed/` ordered by age (oldest first) and walk the user 
 
 ### `/review`
 
-Walk the user through pending items in `goals/proposals/`. For each proposal, present the suggested change, the source that triggered it, and the reasoning. The user accepts, modifies, or discards. Accepted proposals are applied to `GOALS.md` or plan files, and the agent settles any downstream effects.
+Walk the user through pending items in `.canon/proposals/`. For each proposal, present the suggested change, the source that triggered it, and the reasoning. The user accepts, modifies, or discards. Accepted proposals are applied to `GOALS.md` or plan files, and the agent settles any downstream effects.
 
 **Completion criteria:** All proposals addressed. Any accepted changes applied and KB consistency verified.
 
@@ -289,7 +355,7 @@ Validate knowledge base consistency. The agent reads the full `.canon/` structur
 - All cross-references (`§` addresses) resolve to existing sections.
 - All `INDEX.md` files are complete (no orphaned docs, no dead links).
 - All reference docs have valid frontmatter (headnote + last_updated).
-- All source files have valid frontmatter (name + ingested).
+- All source files have valid frontmatter (headnote + last_updated + name + ingested).
 
 Reports errors if any. This is the same validation the agent runs at the end of every write operation, exposed as a standalone command for manual use or verification.
 
@@ -299,7 +365,7 @@ Reports errors if any. This is the same validation the agent runs at the end of 
 
 ## CLAUDE.md Structure
 
-`CLAUDE.md` is the entire application. It's organized with one section per slash command plus a preamble that covers the directory convention, file formats, citation syntax, and consistency rules.
+`CLAUDE.md` contains the shared context that all skills reference: directory conventions, file formats, citation syntax, addressing rules, and the consistency model. It does *not* contain workflow definitions — those live in individual `SKILL.md` files under `.claude/skills/`.
 
 ```markdown
 # Canon — Knowledge Base Agent Instructions
@@ -307,64 +373,13 @@ Reports errors if any. This is the same validation the agent runs at the end of 
 ## Overview
 Canon is a goal-driven knowledge base stored in `.canon/`.
 [Directory structure, frontmatter specs, reference doc format,
-addressing syntax, citation signals — all from this PRD.]
+addressing syntax, citation signals.]
 
 ## Consistency Rules
 [The consistency model: what the agent must verify after every write.]
-
-## /crystallize
-### Purpose
-Build or refine the goal tree through interactive conversation.
-
-### Steps
-1. ...
-
-### Constraints
-- ...
-
-### Completion Criteria
-- GOALS.md exists with at least one root goal.
-- Sub-goal structure is sufficient to evaluate incoming information.
-
-## /ingest
-### Purpose
-Store a source document and integrate its claims into the knowledge base.
-
-### Steps
-1. Create source file in `.canon/sources/` ...
-...
-
-### Constraints
-- Never modify GOALS.md or plan files directly. Draft proposals instead.
-- Every factual claim must have an inline citation.
-- Run /lint as the final step.
-
-### Completion Criteria
-- Source file exists in `sources/`.
-- All extracted claims are cited in reference docs.
-- INDEX.md files reflect any new or moved documents.
-- /lint passes with no errors.
-
-## /recall
-...
-
-## /brief
-...
-
-## /check
-...
-
-## /triage
-...
-
-## /review
-...
-
-## /lint
-...
 ```
 
-Each section is self-contained. If a workflow misbehaves, you refine that section — the blast radius is scoped. The `CLAUDE.md` is itself version-controlled, so workflow changes are tracked alongside the knowledge they operate on.
+Workflow logic is factored into skills so that each workflow is self-contained and independently editable. If a workflow misbehaves, you refine that skill's `SKILL.md` — the blast radius is scoped. Both `CLAUDE.md` and the skills directory are version-controlled, so changes are tracked alongside the knowledge they operate on.
 
 ---
 
@@ -386,7 +401,7 @@ Every `/ingest` requires multi-step agent reasoning: claim extraction, citation 
 
 ### Conflict Resolution Discovery
 
-The current design flags contradictions with `But see:` citations and defers resolution to `goals/GOALS.md` / `goals/plans/` where it's on the critical path. `/brief` is specced to surface these, but the exact heuristic for "on the critical path" needs definition.
+The current design flags contradictions with `But see:` citations and defers resolution to `.canon/GOALS.md` / `.canon/plans/` where it's on the critical path. `/brief` is specced to surface these, but the exact heuristic for "on the critical path" needs definition.
 
 ### Recall Depth vs. Cost
 
