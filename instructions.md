@@ -4,7 +4,7 @@ The `kb` directory is a structured, citation-backed knowledge base.
 
 ## When this applies
 
-These instructions apply when the user asks you to create or modify kb entries. This is not a background responsibility — don't let it compete for attention when you're focused on other work.
+This information is relevant when you want to search the knowledge base for information, or when the user asks you to create or modify kb entries. Maintaining the knowledge base is not a background responsibility — don't let it compete for attention when you're focused on other work.
 
 ## Principles
 
