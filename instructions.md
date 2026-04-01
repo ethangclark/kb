@@ -62,23 +62,9 @@ Use `Established:` as the default. The others are optional precision for when th
 | `Accord:` | Corroborated by another source |
 | `See generally:` | Background or framework reference |
 
----
+# Compact instructions
 
-# TODO
+When compacting context, use `kb/GOALS.md` to orient. Identify which priority the user is actively working on and what the likely next ~hour of work looks like. Then
 
-## Including source material in repo as a matter of course
-
-Call transcripts, relevant screenshots, etc. should be included. The process by which this occurs should be highly automated.
-
-## Pre-merge validation script
-
-Build a validation script (runnable locally and in CI) that checks kb integrity before merge. The goal is structural correctness enforced automatically — like type-checking in a TypeScript repo — so that consistency doesn't depend on manual diligence.
-
-The script should check:
-
-1. **Graph connectivity**: Every `.md` in `kb` is reachable from `kb/GOALS.md` via internal links. Flag orphaned files.
-2. **Reference validity**: Every cross-reference (`kb/path/file.md#heading`) resolves to an existing file and heading. Flag broken links.
-3. **Citation coverage**: Every heading that contains prose also contains a citation bracket (`[Established: ...]`, `[citation needed]`, etc.). Flag uncited claims.
-4. **File size**: Flag any kb file exceeding ~2 pages (rough heuristic: e.g. >120 lines) as a candidate for splitting.
-
-This should run as a pre-merge check so that kb drift is caught structurally rather than relying on the person (or agent) editing to remember all the rules. The current manual process is a pilot — this automation is the intended end state.
+- **Keep:** Everything from CLAUDE.md and kb/GOALS.md
+- **Drop:** Everything else not related to achieving the goals they will be working on in the next ~hour.
